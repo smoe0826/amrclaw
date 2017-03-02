@@ -4,7 +4,7 @@ c     =====================================================
       subroutine flux1(maxm,meqn,maux,mbc,mx,
      &                 q1d,dtdx1d,aux1,
      &                 faddm,faddp,cfl1d,wave,s,
-     &                 amdq,apdq,cqxx,bmasdq,bpasdq,rp1)
+     &                 amdq,apdq,cqxx,bmasdq,bpasdq,rp1_ptwise)
 c     =====================================================
 c
 c     # clawpack routine ...  modified for AMRCLAW
@@ -36,7 +36,7 @@ c
 c
       use amr_module
       implicit double precision (a-h,o-z)
-      external rp1
+      external rp1_ptwise
       dimension    q1d(meqn,1-mbc:maxm+mbc)
       dimension   amdq(meqn,1-mbc:maxm+mbc)
       dimension   apdq(meqn,1-mbc:maxm+mbc)
@@ -48,10 +48,27 @@ c
 c
       dimension     s(mwaves, 1-mbc:maxm+mbc)
       dimension  wave(meqn, mwaves, 1-mbc:maxm+mbc)
+
+      dimension qp_l(1:meqn), qp_r(1:meqn)
+      dimension auxp_l(1:maux), auxp_r(1:maux)
+      dimension wave_p(1:meqn, 1:mwaves)
+      dimension s_point(1:mwaves)
+      dimension apdq_p(1:meqn), amdq_p(1:meqn)
+
+
 c
       logical limit
       common /comxt/ dtcom,dxcom,tcom,icom
 c
+
+
+      num_eqn=meqn/DGorder
+      num_ghost=mbc
+      num_aux=maux
+      num_waves=mwaves
+ 
+
+
       limit = .false.
       do 5 mw=1,mwaves
          if (mthlim(mw) .gt. 0) limit = .true.
@@ -71,8 +88,52 @@ c
 c     # solve Riemann problem at each interface and compute Godunov updates
 c     ---------------------------------------------------------------------
 c
-      call rp1(maxm,meqn,mwaves,maux,mbc,mx,q1d,q1d,
-     &          aux1,aux1,wave,s,amdq,apdq)
+c      call rp1(maxm,meqn,mwaves,maux,mbc,mx,q1d,q1d,
+c     &          aux1,aux1,wave,s,amdq,apdq)
+
+
+      do i = 2-num_ghost, mx+num_ghost
+        ! q(:,i-1) is still in cache from last cycle of i loop, so
+        ! update it first
+
+        do m = 1, num_eqn
+            qp_l(m) = q1d(m,i-1)
+            qp_r(m) = q1d(m,i)
+            do j = 1, num_waves
+               wave_p(m,j) = 0.0
+            end do
+            amdq_p(m) = 0.0
+            apdq_p(m) = 0.0
+        end do
+        do m = 1, num_aux
+            auxp_l(m) = aux1(m,i-1)
+            auxp_r(m) = aux1(m,i)
+        end do
+
+        do j = 1 , num_waves
+               s_point(j) = 0.0
+        end do
+
+        call rp1_ptwise(num_eqn, num_aux, num_waves, qp_l, qp_r 
+     &  , auxp_l, auxp_r,wave_p,s_point,amdq_p,apdq_p)
+
+        do m = 1, num_eqn
+            amdq(m,i) = amdq_p(m)
+            apdq(m,i) = apdq_p(m)
+            do j = 1 , num_waves
+               wave(m,j,i) = wave_p(m,j)
+            end do
+        end do
+
+        do j = 1 , num_waves
+               s(j,i)=s_point(j)
+        end do
+
+
+      end do
+
+
+
 c
 c     # Set fadd for the donor-cell upwind method (Godunov)
       do 40 i=1,mx+1

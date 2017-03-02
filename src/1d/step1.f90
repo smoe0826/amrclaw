@@ -64,6 +64,7 @@ subroutine step1(maxm,meqn,maux,mbc,mx,qold,aux,dx,dt,cflgrid,fm,fp,rp1)
     
     fm = 0.d0
     fp = 0.d0
+
     
     ! ============================================================================
     ! Perform X-Sweep

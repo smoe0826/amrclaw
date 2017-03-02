@@ -6,11 +6,18 @@ COMMON_MODULES += \
   $(AMRLIB)/amr_module.f90 \
   $(AMRLIB)/gauges_module.f90 \
   $(AMRLIB)/regions_module.f90 \
+  $(AMRLIB)/modalDGmod.f90 \ 
 
 COMMON_SOURCES += \
   $(AMRLIB)/qinit.f \
   $(AMRLIB)/setprob.f \
   $(AMRLIB)/setaux.f90 \
+  $(AMRLIB)/fluxFunction.f90 \
+  $(AMRLIB)/setWaveSpeed.f90 \
+  $(AMRLIB)/RiemannSolveLLF.f90 \
+  $(AMRLIB)/projectL2.f90 \
+  $(AMRLIB)/forcingFunction.f90 \
+  $(AMRLIB)/evaluateExpansion.f90 \
   $(AMRLIB)/amr1.f90 \
   $(AMRLIB)/bc1amr.f \
   $(AMRLIB)/b4step1.f90 \

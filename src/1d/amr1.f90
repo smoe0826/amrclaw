@@ -72,6 +72,7 @@ program amr1
 
     use amr_module, only: method, mthlim, use_fwaves, numgrids
     use amr_module, only: nghost, mwaves, mcapa, auxtype
+    use amr_module, only: DGorder
     use amr_module, only: tol, tolsp, flag_richardson, flag_gradient
 
     use amr_module, only: nghost, mthbc
@@ -104,7 +105,7 @@ program amr1
     integer :: i, iaux, mw, level
     integer :: ndim, nvar, naux, mcapa1, mindim
     integer :: nstart, nsteps, nv1, nx, lentotsave, num_gauge_SAVE
-    integer :: omp_get_max_threads, maxthreads
+    integer :: maxthreads
     real(kind=8) :: time, ratmet, cut, dtinit, dt_max
     logical :: vtime, rest, output_t0    
 
@@ -151,6 +152,7 @@ program amr1
     read(inunit,*) nvar    ! meqn
     read(inunit,*) mwaves
     read(inunit,*) naux
+    read(inunit,*) DGorder
     read(inunit,*) t0
 
     ! ==========================================================================
@@ -215,6 +217,9 @@ program amr1
     read(inunit,*) cfl        ! clf_desired
     read(inunit,*) nv1        ! steps_max
       
+
+      print *,'max steps=',nv1
+
     if (output_style /= 3) then
         !nstop = nv1
         nstop = iinfinity   ! basically disabled this test
@@ -226,6 +231,8 @@ program amr1
     else
         method(1) = 1
     endif
+
+      print *,'vtime=',vtime
 
     read(inunit,*) method(2)  ! order
     iorder = method(2)
@@ -548,7 +555,7 @@ program amr1
     ! --------------------------------------------------------
     !  Tick is the main routine which drives the computation:
     ! --------------------------------------------------------
-
+    print *,'vtime outside tick=',vtime
     call tick(nvar,cut,nstart,vtime,time,naux,t0,rest,dt_max)
     ! --------------------------------------------------------
 

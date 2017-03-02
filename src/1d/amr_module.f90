@@ -113,6 +113,7 @@ module amr_module
     logical xperdom
     real(kind=8) :: xupper, xlower
     integer :: nghost, mthbc(2)
+    integer :: DGorder
 
     ! ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     ! :::::  collect stats

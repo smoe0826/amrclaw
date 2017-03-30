@@ -18,18 +18,21 @@
 !  after intersections at specified level.
 ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
 !
-subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc)
+subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc,indic,indic11)
 
     use amr_module, only: possk, mxnest, iregsz, nghost, outunit, alloc
     use amr_module, only: node, lstart, store1, store2, levelptr, timemult,gridNbor
     use amr_module, only: rnode, ndilo, ndihi, nextfree
     use amr_module, only: bndListNum, bndListSt
     use amr_module, only: listStart, listOfGrids, bndList, numgrids
+    use amr_module, only: DGorder,hxposs
+    use amr_module, only: xlower,xupper
+    use modalDGmod
 
     implicit none
 
     ! Input
-    integer, intent(in) :: mi, nrowst, ilo, ihi, level, nvar, naux,msrc
+    integer, intent(in) :: mi, nrowst, ilo, ihi, level, nvar, naux,msrc,indic,indic11
     real(kind=8), intent(in) :: time
 
     ! In/Out
@@ -41,10 +44,23 @@ subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc)
     integer :: ixlo, ixhi, locold, locnew, nextSpot
     integer :: icount, bndNum, bndLoc, levSt
     integer :: ivar, i, mptr, mstart, loc, numg
-    real(kind=8) :: dt, alphac, alphai
+    real(kind=8) :: dt, dx, alphac, alphai
     logical :: t_interpolate
 
-    integer :: patch_line(2)
+    double precision, dimension(:,:), allocatable :: localCoeffs
+    double precision, dimension(:,:), allocatable :: qpointL
+    double precision, dimension(:,:), allocatable :: qpointR
+    double precision, dimension(:,:), allocatable :: fluxL
+    double precision, dimension(:,:), allocatable :: fluxR
+    double precision, dimension(:,:), allocatable :: translateMon
+    double precision, dimension(:), allocatable :: xivals
+    double precision, dimension(1,1) :: xpt
+   
+    double precision :: xlow_fine,dx_fine,dx1
+
+    integer :: patch_line(2),k,k1
+
+    integer :: num_eqn,maxPolyDegree,nQuad
 
     real(kind=8), parameter :: t_epsilon = 1.0d-4
 
@@ -59,6 +75,34 @@ subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc)
             "' time wanted ',e24.16,' source time is ',e24.16,/," // &
             "' alphai, t_epsilon ',2e24.16)"
 
+
+    !set actual number of equations
+    num_eqn=nvar/DGorder
+    maxPolyDegree = DGorder-1
+    nQuad = DGorder
+    allocate(localCoeffs(0:maxPolyDegree,1:num_eqn))
+    allocate(fluxL(1,1:num_eqn))
+    allocate(fluxR(1,1:num_eqn))
+    allocate(qpointL(1,1:num_eqn))
+    allocate(qpointR(1,1:num_eqn))
+    allocate(translateMon(0:maxPolyDegree,0:maxPolyDegree))
+    allocate(xivals(1:nQuad+1))
+
+    fluxL=0.d0
+    fluxR=0.d0
+    qpointL=0.d0
+    qpointR=0.d0
+    translateMon=0.d0
+    xivals=0.d0
+    xpt=0.d0
+
+    DO i=0,maxPolyDegree
+       DO k=0,maxPolyDegree
+         translateMon(k,i) = legendre2Mon(k,i)
+       ENDDO !k
+    ENDDO !i
+
+
     patch_line = [ilo,ihi]
 
     ! Note that we need a non-dimensionalized t epspatch_line(1)n as it was a problem
@@ -66,6 +110,8 @@ subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc)
     
     ! Time step at this level
     dt = possk(level)
+    dx = hxposs(level)
+ 
       
     ! Initialize the flagging where we set things
     flaguse = 0
@@ -94,6 +140,8 @@ subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc)
         ! Check if grid mptr and patch intersect
         imlo = node(ndilo, mptr)
         imhi = node(ndihi, mptr)
+                  
+
 
         nx = node(ndihi,mptr) - node(ndilo,mptr) + 1
         
@@ -101,6 +149,11 @@ subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc)
 
         ixlo = max(imlo,patch_line(1))
         ixhi = min(imhi,patch_line(2))
+
+        !print *,'here41',' ilo= ',ilo,' ihi= ',ihi
+        !print *,'patch_line1=',patch_line(1),'patch_line2=',patch_line(2)
+        !print *,'imlo=',imlo,'level=',level,msrc,mptr
+        !print *,rnode(1,mptr),rnode(2,mptr),rnode(3,mptr)
 
         ! Check to see if grid and patch interesect, if not continue to next
         ! grid in the list
@@ -152,23 +205,92 @@ subroutine intfil(val,mi,time,flaguse,nrowst,ilo,ihi,level,nvar,naux,msrc)
             ! Actual interpolation
             if (.not. t_interpolate) then
                 ! No time interp. copy the solution values
-                do ivar = 1, nvar
-                    do i = ixlo, ixhi
+                do i = ixlo, ixhi
+
+                if(indic11==1) then
+                 do ivar = 1, nvar
                         val(ivar,i-patch_line(1)+nrowst) = &
                             alloc(iadd(ivar,i-imlo+nghost+1))
-                        flaguse(i) = 1
-                    end do
+                 end do
+                 flaguse(i) = 1
+               else
+               do k=1,num_eqn
+                 do k1=1,DGorder
+                       localCoeffs(k1-1,k) = alloc(iadd((k-1)*DGorder+k1,i-imlo+nghost+1))
+                 end do
+               end do
+
+                  !print *,'i=',i,i-patch_line(1)+nrowst
+                  !print *,'place 1=',xlower+i*dx,xlower+(i+1)*dx
+                  !print *,'place 2=',i-patch_line(1)+nrowst
+                  xpt(1,1)=-1.d0
+                  call fluxFunction(localCoeffs,xivals,qpointL,fluxL,1,num_eqn &
+                  ,possk(level+1),dx,translateMon,xpt)
+
+                  xpt(1,1)=1.d0
+                  call fluxFunction(localCoeffs,xivals,qpointR,fluxR,1,num_eqn &
+                  ,possk(level+1),dx,translateMon,xpt)
+
+                            val(:,i-patch_line(1)+nrowst)=0.d0
+                            do ivar = 1, num_eqn
+                              val((ivar-1)*DGorder+1,i-patch_line(1)+nrowst) = &
+                                  qpointL(1,ivar)*indic+qpointR(1,ivar)*(1.d0-indic)
+                            end do
+                            flaguse(i) = 1
+
+                end if
                 end do
             else
                 ! Linear interpolation in time
-                do ivar = 1, nvar
-                    do i = ixlo, ixhi
-                        val(ivar,i-patch_line(1)+nrowst) = &
-                            alloc(iadnew(ivar,i-imlo+nghost+1))*alphai + &
-                            alloc(iadold(ivar,i-imlo+nghost+1))*alphac
-                        flaguse(i) = 1
-                    end do
-                end do
+                !do ivar = 1, nvar
+                !    do i = ixlo, ixhi
+                !        val(ivar,i-patch_line(1)+nrowst) = &
+                !            alloc(iadnew(ivar,i-imlo+nghost+1))*alphai + &
+                !            alloc(iadold(ivar,i-imlo+nghost+1))*alphac
+                !        flaguse(i) = 1
+                !    end do
+                !end do
+
+            !print *,'NO!'
+
+            do i = ixlo, ixhi
+
+              !xlow_fine = xlower + (ilo+nghost) * dx
+            xlow_fine = xlower + (i-imlo+nghost+1) * dx
+            !print *,'here we are',xlow_fine,icount,'level=',level
+            !print *,'ixlo=',i,nghost,i-imlo+nghost+1
+            !print *,imlo,ilo+nghost
+
+            dx1=hxposs(level+1)
+
+            do k=1,num_eqn
+           do k1=1,DGorder
+                 localCoeffs(k1-1,k) = alloc(iadold((k-1)*DGorder+k1,i-imlo+nghost+1))
+           end do
+            end do
+
+
+            xpt(1,1)=-1.d0
+            call fluxFunction(localCoeffs,xivals,qpointL,fluxL,1,num_eqn &
+            ,rnode(timemult,mptr) - time,dx,translateMon,xpt)
+
+            xpt(1,1)=1.d0
+            call fluxFunction(localCoeffs,xivals,qpointR,fluxR,1,num_eqn &
+            ,rnode(timemult,mptr) - time,dx,translateMon,xpt)
+
+                   val(:,i-patch_line(1)+nrowst)=0.d0
+                   do ivar = 1, num_eqn
+                     !val((ivar-1)*DGorder+1,i-patch_line(1)+nrowst) = &
+                     !   alloc(iadnew((ivar-1)*DGorder+1,i-imlo+nghost+1))*alphai + &
+                     !   alloc(iadold((ivar-1)*DGorder+1,i-imlo+nghost+1))*alphac
+                     val((ivar-1)*DGorder+1,i-patch_line(1)+nrowst) = &
+                      qpointL(1,ivar)*indic+qpointR(1,ivar)*(1.d0-indic)
+                     !val((ivar-1)*DGorder+2,i-patch_line(1)+nrowst) = &
+                     !    0.5*(qpointR(1,ivar)-qpointL(1,ivar))
+                   end do
+                            flaguse(ixlo:ixhi) = 1
+           end do
+
             endif
 
         endif

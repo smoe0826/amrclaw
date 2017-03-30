@@ -39,6 +39,7 @@ subroutine flag2refine1(mx,mbc,mbuff,meqn,maux,xlower,dx,t,level, &
                             tolsp,q,aux,amrflags,DONTFLAG,DOFLAG)
 
     use regions_module
+    use amr_module, only: DGorder
 
     implicit none
 
@@ -58,12 +59,15 @@ subroutine flag2refine1(mx,mbc,mbuff,meqn,maux,xlower,dx,t,level, &
     external allowflag
 
     ! Locals
-    integer :: i,m
+    integer :: i,m,num_eqn
     real(kind=8) :: x_c,x_low,x_hi
     real(kind=8) :: dqi(meqn), dq(meqn)
 
     ! Initialize flags
     amrflags = DONTFLAG
+
+
+    num_eqn= meqn/DGorder
     
     ! Loop over interior points on this grid
     ! (i) grid cell is [x_low,x_hi], cell center at (x_c)
@@ -85,8 +89,8 @@ subroutine flag2refine1(mx,mbc,mbuff,meqn,maux,xlower,dx,t,level, &
             dq = max(dq,dqi)
 
         ! default checks all components of undivided difference:
-            do m=1,meqn
-                if (dq(m) > tolsp) then
+            do m=1,num_eqn
+                if (dq(DGorder*(m-1)+1) > tolsp) then
                     amrflags(i) = DOFLAG
                     cycle x_loop
                 endif

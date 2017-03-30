@@ -30,6 +30,8 @@ c global
 c    mstart  = start of very coarsest grids.
 c :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 c
+
+      !print *,'regridding at time=',start_time
       verbosity_regrid = method(3)
       lcheck    = min0(lfine,mxnest-1)
       lfnew     = lbase

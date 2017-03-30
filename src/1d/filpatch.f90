@@ -12,11 +12,12 @@
 ! :::::::::::::::::::::::::::::::::::::::;:::::::::::::::::::::::;
 !
 recursive subroutine filrecur(level,nvar,valbig,aux,naux,t,mitot, &
-     nrowst,ilo,ihi,patchOnly,msrc)
+     nrowst,ilo,ihi,patchOnly,msrc,indic,indic11)
 
   use amr_module, only: hxposs, xlower, xupper
   use amr_module, only: outunit, nghost, xperdom
   use amr_module, only: iregsz, intratx, NEEDS_TO_BE_SET
+  use amr_module, only: rnode
 
   !for setaux timing
   use amr_module, only: timeSetaux, timeSetauxCPU
@@ -25,7 +26,7 @@ recursive subroutine filrecur(level,nvar,valbig,aux,naux,t,mitot, &
 
   ! Input
   integer, intent(in) :: level, nvar, naux, mitot, nrowst
-  integer, intent(in) :: ilo,ihi, msrc
+  integer, intent(in) :: ilo,ihi, msrc,indic,indic11
   real(kind=8), intent(in) :: t
   logical  :: patchOnly
 
@@ -81,12 +82,17 @@ recursive subroutine filrecur(level,nvar,valbig,aux,naux,t,mitot, &
   ! Coordinates of edges of patch (xlp,xrp)
   xlow_fine = xlower + ilo * dx_fine
 
+
+  !print *,'recur21=',xlow_fine,'level=',level
+
   ! Fill in the patch as much as possible using values at this level
   ! note that if only a patch, msrc = -1, otherwise a real grid and intfil
   ! uses its boundary list
   ! msrc either -1 (for a patch) or the real grid number
+  !print *,'fine patch',xlower + ilo * dx_fine,xlower + ihi * dx_fine
+  !print *, xlower, ilo, ihi, (ihi-ilo)*dx_fine
   call intfil(valbig,mitot,t,flaguse,nrowst,ilo,  &
-              ihi,level,nvar,naux,msrc)
+              ihi,level,nvar,naux,msrc,indic,indic11)
 
 
   ! Trimbd returns set = true if all of the entries are filled (=1.).
@@ -99,6 +105,7 @@ recursive subroutine filrecur(level,nvar,valbig,aux,naux,t,mitot, &
   ! boundary pieces filled.
   call trimbd(flaguse,mitot_patch,set,unset_indices)
   ! il,ir= unset_indices(2)
+  !print *,'end here',' level= ',level,' set=',set
 
 
   ! If set is .true. then all cells have been set and we can skip to setting
@@ -151,6 +158,7 @@ recursive subroutine filrecur(level,nvar,valbig,aux,naux,t,mitot, &
         stop
      endif
 
+
      ! Set the aux array values for the coarse grid, this could be done 
      ! instead in intfil using possibly already available bathy data from the
      ! grids
@@ -177,10 +185,10 @@ recursive subroutine filrecur(level,nvar,valbig,aux,naux,t,mitot, &
 
      if ((xperdom) .and. sticksout(iplo,iphi)) then
         call prefilrecur(level-1,nvar,valcrse,auxcrse,naux,t,mitot_coarse,1,   &
-             iplo,iphi,iplo,iphi,.true.)
+             iplo,iphi,iplo,iphi,.true.,indic,0)
      else
         call filrecur(level-1,nvar,valcrse,auxcrse,naux,t,mitot_coarse,1,   &
-             iplo,iphi,.true.,-1)  ! when going to coarser patch, no source grid (for now at least)
+             iplo,iphi,.true.,-1,indic,0)  ! when going to coarser patch, no source grid (for now at least)
      endif
 
      ! convert to real for use below
@@ -221,7 +229,8 @@ recursive subroutine filrecur(level,nvar,valbig,aux,naux,t,mitot, &
 
                 valint = valc + eta1 * uslope
 
-                valbig(n,i_fine+nrowst-1) = valint
+                !valbig(n,i_fine+nrowst-1) = valint
+                valbig(n,i_fine+nrowst-1) = valc
 
             end do
 

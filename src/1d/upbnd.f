@@ -32,6 +32,8 @@ c indicated by mcapa not zero (is index of capacity fn.)
 c ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 c
 
+      print *,'doing the conservation fixup!'
+
       do 10 i=1,mitot
          iused(i) = 0.
  10   continue

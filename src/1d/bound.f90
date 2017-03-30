@@ -44,34 +44,50 @@ subroutine bound(time,nvar,ng,valbig,mitot,mptr,aux,naux)
   level  = node(nestlevel, mptr)
   hx     = hxposs(level)
 
+  !print *,'here23=',shape(valbig)
+
   xloWithGhost = xleft  - ng*hx
   xhiWithGhost = xright + ng*hx
   ! used in filaptch for bc1amr: for patches it is called. for full grids called from bound below
   patchOnly = .false.
 
+  !print *,'patch boundary=',xloWithGhost,xhiWithGhost,' level=',level
+  !print *,'left'
+
   ! left boundary
   xl = xleft - ng*hx
   xr = xleft
   if ((xl < xlower) .and. xperdom) then
+     !print *,'thing11'
      call  prefilrecur(level,nvar,valbig,aux,naux,time,mitot,1, &
-          ilo-ng,ilo-1,ilo-ng,ihi+ng,patchOnly)
+          ilo-ng,ilo-1,ilo-ng,ihi+ng,patchOnly,0,1)
+     !print *,'out11'
   else
+     !print *,'thing1',level,'left=',xl,xl+hx,xl+ng*hx
      call filrecur(level,nvar,valbig,aux,naux,time,mitot,1,ilo-ng, &
-          ilo-1,patchOnly,mptr)
+          ilo-1,patchOnly,mptr,0,1)
+     !print *,'out1',level
   endif
+
+  !print *,'right'
 
   ! right boundary
   xl = xright
   xr = xright + ng*hx
 
   if ((xr .gt. xupper) .and. xperdom) then
+     !print *,'thing21'
      call  prefilrecur(level,nvar,valbig,aux,naux,time,mitot, &
-          mitot-ng+1,ihi+1,ihi+ng,ilo-ng,ihi+ng,patchOnly)
+          mitot-ng+1,ihi+1,ihi+ng,ilo-ng,ihi+ng,patchOnly,1,1)
+     !print *,'out21'
   else
+     !print *,'thing2'
      call filrecur(level,nvar,valbig,aux,naux,time,mitot, &
-          mitot-ng+1,ihi+1,ihi+ng,patchOnly,mptr)
+          mitot-ng+1,ihi+1,ihi+ng,patchOnly,mptr,1,1)
+     !print *,'out2'
   endif
 
+  !print *,''
 
   ! set all exterior (physical)  boundary conditions for this grid at once
   ! used to be done from filpatch, but now only for recursive calls with new patch

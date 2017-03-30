@@ -45,5 +45,6 @@ subroutine trimbd(used,nrow,set,unset_rect)
         enddo
 
     endif
+    !print *,"trimbd=",set
 
 end subroutine trimbd

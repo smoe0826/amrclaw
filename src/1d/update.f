@@ -4,10 +4,38 @@ c
       subroutine update (level, nvar, naux)
 c
       use amr_module
+      use modalDGmod
       implicit double precision (a-h,o-z)
 
 
       integer listgrids(numgrids(level))
+
+      integer :: num_eqn
+      double precision, dimension(:,:), allocatable :: legendreQuad
+      double precision, dimension(:,:), allocatable :: dlegendreQuad
+      double precision, dimension(:,:), allocatable :: legendreQuadh1
+      double precision, dimension(:,:), allocatable :: dlegendreQuadh1
+      double precision, dimension(:,:), allocatable :: dlagQuadh1
+      double precision, dimension(:), allocatable :: quadNodes
+      double precision, dimension(:), allocatable :: quadWeights
+      double precision, dimension(:,:), allocatable :: quadNodesSub
+      double precision, dimension(:,:), allocatable :: quadWeightsSub
+      double precision, dimension(:,:), allocatable :: dlagQuad
+      double precision, dimension(:,:), allocatable :: Vpoly
+
+      double precision, dimension(:,:), allocatable :: localCoeffs
+      double precision, dimension(:,:), allocatable :: localCoeffsSub
+
+      double precision :: sum1
+
+
+      double precision, dimension(:,:,:), allocatable :: legendreQuadSub
+
+      integer :: i1,k1,i2,j1,j2
+      integer :: refinement_ratio_x
+
+      double precision :: subdx,bigdx
+     
 
 c$$$  OLD INDEXING
 c$$$      iadd(i,j,ivar)  = loc     + i - 1 + mitot*((ivar-1)*mjtot+j-1)
@@ -31,7 +59,22 @@ c    level  - ptr to the only level to be updated. levels coarser than
 c             this will be at a diffeent time.
 c :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 c
+      !set actual number of equations
+      num_eqn=nvar/DGorder
+      deg   = DGorder
+      maxPolyDegree = DGorder-1
+      nQuad = DGorder
+
+      meqn   = nvar
+      num_eqn= meqn/DGorder
+
       lget = level
+      refinement_ratio_x = intratx(level)
+
+      subdx=2.0/refinement_ratio_x
+
+      !print *,'refinement ratio= ',refinement_ratio_x, level
+ 
       if (uprint) write(outunit,100) lget
 100   format(19h    updating level ,i5)
 c     need to set up data structure for parallel distrib of grids
@@ -40,7 +83,67 @@ c     call prepgrids(listgrids,numgrids(level),level)
 c
 c  grid loop for each level
 c
+
+      allocate(quadNodes(0:nQuad),quadWeights(0:nQuad))
+      allocate(quadNodesSub(1:refinement_ratio_x,0:nQuad))
+      allocate(quadWeightsSub(1:refinement_ratio_x,0:nQuad))
+      allocate(legendreQuad(0:maxPolyDegree,0:nQuad))
+
+      allocate(legendreQuadSub(1:refinement_ratio_x,
+     & 0:maxPolyDegree,0:nQuad))
+
+
+      CALL gaussQuadNodes(nQuad+1,quadNodes)
+      CALL gaussQuadWeights(nQuad+1,quadNodes,quadWeights)
+
+      !print *,'quadnodes= ',quadNodes
+
+      DO i1=0,nQuad
+       DO k1=0,maxPolyDegree
+         legendreQuad(k1,i1) = legendre(quadNodes(i1),k1)
+       ENDDO !k1
+      ENDDO !i1
+
+      subdx=2.0/refinement_ratio_x
+
+
+      Do k1=1,refinement_ratio_x
+        Do i1=0,nQuad
+           quadNodesSub(k1,i1)=-1.d0+(k1-1)*subdx+0.5*subdx
+     &    +0.5*subdx*quadNodes(i1)
+           quadWeightsSub(k1,i1)=0.5*0.5*subdx*quadWeights(i1)
+        Enddo
+      Enddo
+
+
+      DO i2=1,refinement_ratio_x
+      DO i1=0,nQuad
+       DO k1=0,maxPolyDegree
+         legendreQuadSub(i2,k1,i1) = legendre(quadNodesSub(i2,i1),k1)
+       ENDDO !k1
+      ENDDO !i1
+      ENDDO !i2
+
+
+c      sum1=0.d0
+c      do i1=1,4
+c      do k1=0,nQuad
+c        sum1=sum1+quadWeightsSub(i1,k1)*legendreQuadSub(i1,2,k1)*
+c     &  legendreQuadSub(i1,2,k1)*(2.d0*2.d0+1.d0)
+      !end do
+      !end do
+
+      !print *,'sum= ',sum1
+
+
+      !print *,'here 1',quadNodesSub(1,:)
+      !print *,'here 2',quadNodesSub(2,:)
+      !print *,'here 3',quadNodesSub(3,:)
+      !print *,'here 4',quadNodesSub(4,:)
+
+
       dt     = possk(lget)
+
 
 c      mptr = lstart(lget)
 c 20   if (mptr .eq. 0) go to 85
@@ -69,8 +172,8 @@ c 20   if (mptr .eq. 0) go to 85
 c
          if (node(cfluxptr,mptr) .eq. 0) go to 25
 c         locuse = igetsp(mitot*mjtot)
-         call upbnd(alloc(node(cfluxptr,mptr)),alloc(loc),nvar,
-     1              naux,mitot,listsp(lget),mptr)
+c         call upbnd(alloc(node(cfluxptr,mptr)),alloc(loc),nvar,
+c     1              naux,mitot,listsp(lget),mptr)
 c     1              mitot,mjtot,listsp(lget),alloc(locuse),mptr)
 c         call reclam(locuse,mitot*mjtot)
 c
@@ -109,21 +212,35 @@ c
 c
 c  update using intrat fine points in each direction
 c
-           do 35 ivar = 1, nvar
- 35           alloc(iadd(ivar,i)) = 0.d0
+
+
 c
            if (mcapa .eq. 0) then
-               do 50 ico  = 1, intratx(lget)
-               do 40 ivar = 1, nvar
-                 alloc(iadd(ivar,i))= alloc(iadd(ivar,i)) +
-     1                        alloc(iaddf(ivar,iff+ico-1))
+
+           do 35 ivar = 1, nvar
+ 35         alloc(iadd(ivar,i)) = 0.d0
+
+            do 50 ico  = 1, intratx(lget)
+
+               do 40 ivar = 1, num_eqn
+                 do k1=1,DGorder
+                 do k=0,nQuad
+                 do i1=1,DGorder
+                 alloc(iadd(DGorder*(ivar-1)+k1,i))= 
+     &            alloc(iadd(DGorder*(ivar-1)+k1,i)) +
+     &            alloc(iaddf(DGorder*(ivar-1)+i1,iff+ico-1))
+     &            *legendreQuad(i1-1,k)*legendreQuadSub(ico,k1-1,k)
+     &            *quadWeightsSub(ico,k)*(2.d0*(k1-1.d0)+1.d0)
+                 end do
+                 end do
+                 end do
  40              continue
+
  50            continue
-            do 60 ivar = 1, nvar
- 60          alloc(iadd(ivar,i)) = alloc(iadd(ivar,i))/totrat
                
            else
 
+               print *,'BAD!'
                do 51 ico  = 1, intratx(lget)
                capa = alloc(iaddfaux(iff+ico-1))
                do 41 ivar = 1, nvar

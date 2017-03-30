@@ -67,6 +67,8 @@ c We want to do this regardless of the threading type
          locaux = node(storeaux,mptr)
          time   = rnode(timemult,mptr)
 c
+c         print *,'varbig=',locnew,'h11 ',mitot,' thing'
+c     &   ,shape(alloc)
           call bound(time,nvar,nghost,alloc(locnew),mitot,mptr,
      1               alloc(locaux),naux)
 
@@ -222,10 +224,10 @@ c
             locsvq = locsvf + nvar*lenbc
             locx1d = locsvq + nvar*lenbc
 
-         call qad(alloc(locnew),mitot,nvar,
-     1             alloc(locsvf),alloc(locsvq),lenbc,
-     2            intratx(level-1),hx,
-     3            naux,alloc(locaux),alloc(locx1d),delt,mptr)
+c         call qad(alloc(locnew),mitot,nvar,
+c     1             alloc(locsvf),alloc(locsvq),lenbc,
+c     2            intratx(level-1),hx,
+c     3            naux,alloc(locaux),alloc(locx1d),delt,mptr)
          endif
 
 c        # See if the grid about to be advanced has gauge data to output.

@@ -289,7 +289,7 @@ c                   adjust time steps for this and finer levels
               else
                  level = level - 1
                  call system_clock(clock_start,clock_rate)
-                 call update(level,nvar,naux)
+                 !call update(level,nvar,naux)
                  call system_clock(clock_finish,clock_rate)
                  timeUpdating=timeUpdating+clock_finish-clock_start
               endif

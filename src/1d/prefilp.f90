@@ -16,7 +16,7 @@
 !
 ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 recursive subroutine prefilrecur(level,nvar,valbig,auxbig,naux,time,mitot,  &
-                                 nrowst,ilo,ihi,iglo,ighi,patchOnly)
+                                 nrowst,ilo,ihi,iglo,ighi,patchOnly,indic,indic11)
 
 
 
@@ -30,7 +30,7 @@ recursive subroutine prefilrecur(level,nvar,valbig,auxbig,naux,time,mitot,  &
 
     ! Input
     integer, intent(in) :: level, nvar, naux, mitot
-    integer, intent(in) :: ilo,ihi,iglo,ighi
+    integer, intent(in) :: ilo,ihi,iglo,ighi,indic,indic11
     real(kind=8), intent(in) :: time
     ! false when called from bound, when valbig is whole grid but only filling patch.
     ! true for recursive coarse sub-patches - grid is patch
@@ -111,7 +111,7 @@ recursive subroutine prefilrecur(level,nvar,valbig,auxbig,naux,time,mitot,  &
                 call auxCopyIn(auxPatch,mi,auxbig,mitot,naux,i1,i2,iglo)
 
             call filrecur(level,nvar,valPatch,auxPatch,naux,time,mi,1,       &
-                    i1+ishift(i),i2+ishift(i),.true.,msrc)
+                    i1+ishift(i),i2+ishift(i),.true.,msrc,indic,indic11)
 
             ! copy it back to proper place in valbig
             call patchCopyOut(nvar,valPatch,mi,valbig,mitot,i1,i2,iglo)

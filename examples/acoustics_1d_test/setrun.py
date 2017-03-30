@@ -38,7 +38,7 @@ def setrun(claw_pkg='amrclaw'):
     probdata = rundata.new_UserData(name='probdata', fname='setprob.data')
     probdata.add_param('rho',  1.0,  'density of medium')
     probdata.add_param('K',    1.0,  'bulk modulus')
-    probdata.add_param('beta', 200., 'Gaussian width parameter')
+    probdata.add_param('beta', 400., 'Gaussian width parameter')
 
     
     #------------------------------------------------------------------
@@ -60,7 +60,7 @@ def setrun(claw_pkg='amrclaw'):
     clawdata.upper[0] = 1.000000e+00          # xupper
     
     # Number of grid cells:
-    clawdata.num_cells[0] = 75      # mx
+    clawdata.num_cells[0] = 10      # mx
 
     # add DG order 
     clawdata.add_attribute('DGorder',5)
@@ -114,8 +114,8 @@ def setrun(claw_pkg='amrclaw'):
     if clawdata.output_style==1:
         # Output ntimes frames at equally spaced times up to tfinal:
         # Can specify num_output_times = 0 for no output
-        clawdata.num_output_times = 20
-        clawdata.tfinal = 40.0
+        clawdata.num_output_times = 5
+        clawdata.tfinal = 10.0
         clawdata.output_t0 = True  # output at initial (or restart) time?
         
     elif clawdata.output_style == 2:
@@ -165,9 +165,9 @@ def setrun(claw_pkg='amrclaw'):
     clawdata.dt_max = 1.000000e+99
     
     # Desired Courant number if variable dt used 
-    clawdata.cfl_desired = 0.03
+    clawdata.cfl_desired = 0.04
     # max Courant number to allow without retaking step with a smaller dt:
-    clawdata.cfl_max = 0.04
+    clawdata.cfl_max = 0.05
     
     # Maximum number of time steps to allow between output times:
     clawdata.steps_max = 500
@@ -261,11 +261,11 @@ def setrun(claw_pkg='amrclaw'):
     amrdata = rundata.amrdata
 
     # max number of refinement levels:
-    amrdata.amr_levels_max = 1
+    amrdata.amr_levels_max = 3
     
     # List of refinement ratios at each level (length at least amr_level_max-1)
-    amrdata.refinement_ratios_x = [1, 2]
-    amrdata.refinement_ratios_t = [2, 2]
+    amrdata.refinement_ratios_x = [4, 4, 2]
+    amrdata.refinement_ratios_t = [4, 4, 2]
     
     
     # Specify type of each aux variable in clawdata.auxtype.
@@ -280,7 +280,7 @@ def setrun(claw_pkg='amrclaw'):
     
     # Flag for refinement using routine flag2refine:
     amrdata.flag2refine = True      # use this?
-    amrdata.flag2refine_tol = 0.1 # tolerance used in this routine
+    amrdata.flag2refine_tol = 0.001 # tolerance used in this routine
     # User can modify flag2refine to change the criterion for flagging.
     # Default: check maximum absolute difference of first component of q
     # between a cell and each of its neighbors.
@@ -304,6 +304,11 @@ def setrun(claw_pkg='amrclaw'):
     # Regions:
     # ---------------
     rundata.regiondata.regions = []
+    #rundata.regiondata.regions.append([1,1,0.0,4.0,-1.0,0.0])
+    #rundata.regiondata.regions.append([2,2,0.0,4.0,0.0,1.0])
+    #rundata.regiondata.regions.append([1,1,0.0,4.0,-1.0,-0.5])
+    #rundata.regiondata.regions.append([1,1,0.0,4.0,0.5,1.0])
+    #rundata.regiondata.regions.append([2,2,0.0,4.0,-0.5,0.5])
     # to specify regions of refinement append lines of the form
     #  [minlevel,maxlevel,t1,t2,x1,x2]
     

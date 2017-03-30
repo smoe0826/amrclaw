@@ -49,7 +49,7 @@ def setplot(plotdata):
 
     # Set up for item on these axes:
     plotitem = plotaxes.new_plotitem(plot_type='1d_plot')
-    plotitem.plot_var = 1
+    plotitem.plot_var = 5
     plotitem.plotstyle = 'o'
     plotitem.color = 'b'
     

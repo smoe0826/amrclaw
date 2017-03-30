@@ -324,6 +324,9 @@ c     &          - (dtdx * (fm(m,i+1) - fp(m,i))) / aux(mcapa,i)
 
  50      continue
 
+
+c        print *,q
+
 c
 c
       if (method(4).eq.1) then

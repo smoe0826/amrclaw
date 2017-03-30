@@ -15,9 +15,12 @@ subroutine filval(val, mitot, dx, level, time,  mic, &
     use amr_module, only: xupper, alloc
     use amr_module, only: outunit, NEEDS_TO_BE_SET, mcapa
     use amr_module, only: iregsz
+    use amr_module, only: DGorder
     
     !for setaux timing
     use amr_module, only: timeSetaux, timeSetauxCPU
+
+    use modalDGmod
 
     implicit none
 
@@ -30,6 +33,13 @@ subroutine filval(val, mitot, dx, level, time,  mic, &
     real(kind=8), intent(in out) :: val(nvar,mitot), aux(naux,mitot)
 
     ! Local storage
+    double precision, dimension(:,:), allocatable :: legendreQuad
+    double precision, dimension(:,:,:), allocatable :: legendreQuadSub
+    double precision, dimension(:), allocatable :: quadNodes
+    double precision, dimension(:), allocatable :: quadWeights
+    double precision, dimension(:,:), allocatable :: quadNodesSub
+    double precision, dimension(:,:), allocatable :: quadWeightsSub
+
     integer :: refinement_ratio_x, iclo, ichi, ng
     integer :: ivar, i, ico, ifine, nx
     real(kind=8) :: valc(nvar,mic), auxc(naux,mic)
@@ -39,7 +49,13 @@ subroutine filval(val, mitot, dx, level, time,  mic, &
     real(kind=8) :: setflags(mitot),maxauxdif,aux2(naux,mitot)
     integer :: mjb
     logical :: sticksoutxfine,sticksoutxcrse
-    
+
+    double precision :: subdx,bigdx
+    integer :: num_eqn,deg,maxPolyDegree,meqn,nQuad   
+
+    integer :: i1,k,k1,i2,j1,j2
+
+ 
     !for setaux timing
     integer :: clock_start, clock_finish, clock_rate
     real(kind=8) :: cpu_start, cpu_finish
@@ -48,10 +64,63 @@ subroutine filval(val, mitot, dx, level, time,  mic, &
     ! External function definitions
     real(kind=8) :: get_max_speed
 
+
+
     refinement_ratio_x = intratx(level-1)
     dx_coarse  = dx * refinement_ratio_x
     xl      = xleft  - dx_coarse
     xr      = xright + dx_coarse
+
+
+      num_eqn=nvar/DGorder
+      deg   = DGorder
+      maxPolyDegree = DGorder-1
+      nQuad = DGorder
+
+      meqn   = nvar
+      num_eqn= meqn/DGorder
+
+
+      allocate(quadNodes(0:nQuad),quadWeights(0:nQuad))
+      allocate(quadNodesSub(1:refinement_ratio_x,0:nQuad))
+      allocate(quadWeightsSub(1:refinement_ratio_x,0:nQuad))
+      allocate(legendreQuad(0:maxPolyDegree,0:nQuad))
+
+
+      allocate(legendreQuadSub(1:refinement_ratio_x,0:maxPolyDegree,0:nQuad))
+
+
+      CALL gaussQuadNodes(nQuad+1,quadNodes)
+      CALL gaussQuadWeights(nQuad+1,quadNodes,quadWeights)
+
+      !print *,'quadnodes= ',quadNodes
+
+      DO i1=0,nQuad
+       DO k1=0,maxPolyDegree
+         legendreQuad(k1,i1) = legendre(quadNodes(i1),k1)
+       ENDDO !k1
+      ENDDO !i1
+
+      subdx=2.0/refinement_ratio_x
+
+
+      Do k1=1,refinement_ratio_x
+        Do i1=0,nQuad
+           quadNodesSub(k1,i1)=-1.d0+(k1-1)*subdx+0.5*subdx &    
+           +0.5*subdx*quadNodes(i1)
+           quadWeightsSub(k1,i1)=0.5*0.5*subdx*quadWeights(i1)
+        Enddo
+      Enddo
+
+
+      DO i2=1,refinement_ratio_x
+      DO i1=0,nQuad
+       DO k1=0,maxPolyDegree
+         legendreQuadSub(i2,k1,i1) = legendre(quadNodesSub(i2,i1),k1)
+       ENDDO !k1
+      ENDDO !i1
+      ENDDO !i2
+
 
     ! if topo not yet final then aux is set outside filval (in gfixup)
     ! and so aux has real data already, (ie dont overwrite here)
@@ -155,27 +224,58 @@ subroutine filval(val, mitot, dx, level, time,  mic, &
     ! Prepare slopes - use min-mod limiters
 
      do i=2, mic-1
-       do ivar = 1, nvar
- 
-            s1p = valc(ivar,i+1) - valc(ivar,i)
-            s1m = valc(ivar,i)   - valc(ivar,i-1)
-            slopex = min(abs(s1p), abs(s1m)) &
-                         * sign(1.d0,valc(ivar,i+1) - valc(ivar,i-1))
-            ! if there's a sign change, set slope to 0.
-            if ( s1m*s1p <=  0.d0) slopex = 0.d0
+!       do ivar = 1, nvar
+! 
+!            s1p = valc(ivar,i+1) - valc(ivar,i)
+!            s1m = valc(ivar,i)   - valc(ivar,i-1)
+!            slopex = min(abs(s1p), abs(s1m)) &
+!                         * sign(1.d0,valc(ivar,i+1) - valc(ivar,i-1))
+!            ! if there's a sign change, set slope to 0.
+!            if ( s1m*s1p <=  0.d0) slopex = 0.d0
+!
+!
+!            do ico = 1,refinement_ratio_x
+!              xoff = (real(ico,kind=8) - 0.5d0) / refinement_ratio_x - 0.5d0
+!              ifine = (i-2) * refinement_ratio_x + nghost + ico
+!
+!              if (setflags(ifine) .eq. NEEDS_TO_BE_SET) then
+!                val(ivar,ifine) = valc(ivar,i) + xoff*slopex
+!              endif
+!
+!            end do
+!
+!       enddo !end of ivar loop
+
+
 
 
             do ico = 1,refinement_ratio_x
-              xoff = (real(ico,kind=8) - 0.5d0) / refinement_ratio_x - 0.5d0
-              ifine = (i-2) * refinement_ratio_x + nghost + ico
 
+              ifine = (i-2) * refinement_ratio_x + nghost + ico
               if (setflags(ifine) .eq. NEEDS_TO_BE_SET) then
-                val(ivar,ifine) = valc(ivar,i) + xoff*slopex
+
+              do ivar = 1, nvar
+                val(ivar,ifine) = 0.d0
+              end do
+
+               do ivar = 1, num_eqn
+                 do k1=1,DGorder
+                 do k=0,nQuad
+                 do i1=1,DGorder
+                 val(DGorder*(ivar-1)+k1,ifine)=&
+                 val(DGorder*(ivar-1)+k1,ifine) + &
+                 valc(DGorder*(ivar-1)+i1,i) &
+                 *legendreQuad(k1-1,k)*legendreQuadSub(ico,i1-1,k) &
+                 *quadWeights(k)*(2.d0*(k1-1.d0)+1.d0)*0.5
+                 end do
+                 end do
+                 end do
+                end do
+
               endif
 
-            end do
-
        enddo !end of ivar loop
+
      enddo !end of coarse i loop
 
     ! adjust to conserve kappa*q, but only where coarse grid was interpolated
@@ -211,8 +311,8 @@ end subroutine filval
 
 subroutine dumpaux(aux,naux,mitot)
    implicit none
-   real(kind=8) :: aux(naux,mitot)
    integer :: naux,mitot,i,iaux
+   real(kind=8) :: aux(naux,mitot)
 
    do i = 1, mitot 
       write(*,444) i,(aux(iaux,i),iaux=1,naux)
